@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Publications – Santulli Lab</title>
+</head>
+
+<body>
+
+  <h1>Publications</h1>
+
+  <p>
+    The following publications are automatically retrieved from PubMed.
+  </p>
+
+  <!-- Publications list will appear here -->
+  <ul id="pubs"></ul>
+
+  <!-- RSS → JSON script -->
+  <script>
+    fetch("https://api.rss2json.com/v1/api.json?rss_url=https://pubmed.ncbi.nlm.nih.gov/rss/search/1hWsC1jJ5A-qte8kpcuVrXkbRYROR8FyO0vQvRL2XWXsz6As4A/?limit=200")
+      .then(response => response.json())
+      .then(data => {
+        const list = document.getElementById("pubs");
+
+        if (!data.items) {
+          list.innerHTML = "<li>Unable to load publications.</li>";
+          return;
+        }
+
+        data.items.forEach(item => {
+          const li = document.createElement("li");
+          li.innerHTML = `<a href="${item.link}" target="_blank">${item.title}</a>`;
+          list.appendChild(li);
+        });
+      })
+      .catch(error => {
+        document.getElementById("pubs").innerHTML =
+          "<li>Error loading publications.</li>";
+      });
+  </script>
+
+</body>
+</html>
