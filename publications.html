@@ -2,49 +2,51 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prof. Gaetano Santulli Publications</title>
 <style>
-  body { font-family: Arial, sans-serif; padding: 20px; }
-  h2 { color: brown; }
-  ul { list-style: none; padding-left: 0; }
+  body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; background:#f5f5f5; }
+  h2 { color: brown; margin-top: 40px; }
+  h3 { margin-top: 20px; }
+  a { color: #007bff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ul { list-style-type: none; padding-left: 0; }
   li { margin-bottom: 15px; }
-  em { display: block; margin-bottom: 5px; }
-  strong.green { color: green; }
-  a { text-decoration: none; }
-  #page-counter { text-align:center; font-size:20px; font-weight:bold; color:white; 
-                  background: linear-gradient(90deg, #36d1dc, #5b86e5); padding:15px; border-radius:10px; }
+  .journal { color: green; font-weight: bold; }
+  .page-counter { text-align:center; font-size:20px; font-weight:bold; color:white; background: linear-gradient(90deg, #36d1dc, #5b86e5); padding:15px; border-radius:10px; margin-top:40px; }
+  u { text-decoration: underline; }
+  .click-link { font-weight: bold; margin-bottom:25px; display:inline-block; }
 </style>
 </head>
 <body>
 
 <p style="color:brown; font-weight:bold; font-size:18px;">
-Peer-reviewed publications authored by Prof. Gaetano Santulli, MD, PhD, FAHA
+  Peer-reviewed publications authored by Prof. Gaetano Santulli, MD, PhD, FAHA
 </p>
-<p style="margin-bottom:25px;">
-  <a href="#books" style="font-weight:bold;">→ Click here for BOOKS & BOOK CHAPTERS</a>
+<p>
+  <a href="#books" class="click-link">→ Click here for BOOKS & BOOK CHAPTERS</a>
 </p>
 
 <div id="publications"></div>
 
 <hr style="margin:40px 0;">
 
-<h2 id="books" style="color:brown;">BOOKS & BOOK CHAPTERS</h2>
-
-<h3 style="margin-top:20px;">BOOKS EDITED BY PROF. SANTULLI</h3>
-<div id="books-list"></div>
+<h2 id="books">BOOKS & BOOK CHAPTERS</h2>
+<h3>BOOKS EDITED BY PROF. SANTULLI</h3>
+<ul id="books-list"></ul>
 
 <h3 style="margin-top:30px;">CHAPTERS IN BOOKS AND TEXTBOOKS (Selection)</h3>
-<div id="chapters-list"></div>
+<ul id="chapters-list"></ul>
 
 <hr style="margin:40px 0;">
-<div id="page-counter">Page Visits: <span id="counter-value">0</span></div>
+
+<div class="page-counter" id="pageCounter">Page Visits: 0</div>
 
 <script>
-// ---------------------- PUBMED FETCH ----------------------
-const query = "(((((Santulli, G[Author]) NOT corrigendum[Title]) NOT spider[Title]) NOT erratum[Title]) NOT habitat[Title]) NOT dogs[Title]) NOT correction[Title]) NOT violence[Title]";
-const batchSize = 999;
-const excludedTitle = "Creation of a Novel Virtual Reality Simulation to Increase Nursing Skills in Management of Workplace Violence";
-const excludedDOI = "10.1097/NNA.0000000000001548";
+// ----------------------- PUBMED FETCH -----------------------
+const query = '(((((Santulli, G[Author]) NOT corrigendum[Title]) NOT spider[Title]) NOT erratum[Title]) NOT habitat[Title]) NOT dogs[Title]) NOT correction[Title]) NOT violence[Title]';
+const excludedTitle = 'Creation of a Novel Virtual Reality Simulation to Increase Nursing Skills in Management of Workplace Violence';
+const excludedDOI = '10.1097/NNA.0000000000001548';
 
 const journalReplacements = {
   "ECLINICALMEDICINE": "LANCET eCLINICALMEDICINE",
@@ -73,82 +75,75 @@ const journalReplacements = {
 
 async function fetchPubmed() {
   const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=100000&retmode=json`;
-  const idsRes = await fetch(esearchUrl);
-  const idsData = await idsRes.json();
-  const ids = idsData.esearchresult.idlist;
+  const searchData = await fetch(esearchUrl).then(r => r.json());
+  const ids = searchData.esearchresult.idlist;
   if (!ids || ids.length === 0) {
-    document.getElementById('publications').innerHTML = "No articles found.";
+    document.getElementById('publications').innerHTML = "<p>No articles found.</p>";
     return;
   }
 
-  const articles = {};
+  const batchSize = 100;
+  let articles = {};
   for (let i = 0; i < ids.length; i += batchSize) {
     const batchIds = ids.slice(i, i + batchSize).join(',');
     const efetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${batchIds}&retmode=xml`;
     const xmlText = await fetch(efetchUrl).then(r => r.text());
     const parser = new DOMParser();
     const xml = parser.parseFromString(xmlText, "application/xml");
-    const pubmedArticles = xml.querySelectorAll("PubmedArticle");
+    const pubArticles = xml.querySelectorAll("PubmedArticle");
 
-    pubmedArticles.forEach(a => {
-      const titleNode = a.querySelector("ArticleTitle");
-      const title = titleNode ? titleNode.textContent : '';
-      if (!title) return;
-
+    pubArticles.forEach(a => {
+      const title = a.querySelector("ArticleTitle")?.textContent || '';
       let doi = '';
       a.querySelectorAll("ArticleId").forEach(id => {
-        if (id.getAttribute("IdType") === "doi") doi = id.textContent;
+        if (id.getAttribute('IdType') === 'doi') doi = id.textContent;
       });
       if (title.includes(excludedTitle) || doi.toLowerCase() === excludedDOI.toLowerCase()) return;
 
-      let journal = (a.querySelector("Journal > Title")?.textContent || '').toUpperCase();
-      if (journalReplacements[journal]) journal = journalReplacements[journal];
+      let journal = a.querySelector("Journal > Title")?.textContent.toUpperCase() || '';
+      journal = journalReplacements[journal] || journal;
       if (journal === "RESEARCH SQUARE") return;
 
       const year = a.querySelector("JournalIssue > PubDate > Year")?.textContent || 'n.d.';
-
-      const authorsNodes = a.querySelectorAll("AuthorList > Author");
-      const authorsArr = [];
-      authorsNodes.forEach(au => {
-        const last = au.querySelector("LastName")?.textContent;
-        const first = au.querySelector("ForeName")?.textContent;
-        if (last && first) {
+      const authors = Array.from(a.querySelectorAll("AuthorList > Author"))
+        .map(au => {
+          const last = au.querySelector("LastName")?.textContent;
+          const first = au.querySelector("ForeName")?.textContent;
+          if (!last || !first) return '';
           let name = `${first} ${last}`;
-          if (name.toLowerCase().includes("gaetano santulli")) name = `<u>${name}</u>`;
-          authorsArr.push(name);
-        }
-      });
+          if (name.includes("Gaetano Santulli")) name = `<u>${name}</u>`;
+          return name;
+        })
+        .filter(Boolean)
+        .join(', ');
 
       if (!articles[year]) articles[year] = [];
       articles[year].push({
-        title, authors: authorsArr.join(', '), journal, year,
-        pmid: a.querySelector("PMID")?.textContent || '', doi
+        title, authors, journal, year,
+        pmid: a.querySelector("PMID")?.textContent || '',
+        doi
       });
     });
   }
 
-  // Sort by year descending
-  const sortedYears = Object.keys(articles).sort((a,b) => b.localeCompare(a));
   const container = document.getElementById('publications');
-  sortedYears.forEach(year => {
-    const ul = document.createElement('ul');
-    const h2 = document.createElement('h2');
-    h2.textContent = `Year: ${year}`;
-    container.appendChild(h2);
-    container.appendChild(ul);
-    articles[year].forEach(p => {
-      const li = document.createElement('li');
-      li.innerHTML = `<strong><a href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank">${p.title}</a></strong><br>
-                      <em>${p.authors}</em><br>
-                      <strong class="green">${p.journal}.</strong> ${p.year}.<br>
-                      PMID: ${p.pmid}<br>
-                      ${p.doi ? `DOI: <a href="https://doi.org/${p.doi}" target="_blank">${p.doi}</a><br>` : ''}`;
-      ul.appendChild(li);
-    });
+  Object.keys(articles).sort((a,b)=>b.localeCompare(a)).forEach(year => {
+    const list = articles[year].map(p => `
+      <li>
+        <strong><a href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank">${p.title}</a></strong><br>
+        <em>${p.authors}</em><br>
+        <span class="journal">${p.journal}.</span> ${p.year}.<br>
+        PMID: ${p.pmid}<br>
+        ${p.doi ? `DOI: <a href="https://doi.org/${p.doi}" target="_blank">${p.doi}</a><br>` : ''}
+      </li><br>
+    `).join('');
+    container.innerHTML += `<h2>Year: ${year}</h2><ul>${list}</ul>`;
   });
 }
 
-// ---------------------- BOOKS ----------------------
+fetchPubmed();
+
+// ----------------------- BOOKS -----------------------
 const books = [
   ["Gaetano Santulli","ANGIOGENESIS: INSIGHTS FROM A SYSTEMATIC OVERVIEW","Nova Publishers Inc., New York, NY","2013","978-162618114-4",""],
   ["Gaetano Santulli","ADRENAL GLANDS: FROM PATHOPHYSIOLOGY TO CLINICAL PRACTICE","Nova Publishers Inc.","2015","978-1634835503",""],
@@ -163,21 +158,19 @@ const books = [
   ["Bruno Trimarco, Gaetano Santulli","DIETARY SUPPLEMENTS IN CARDIOVASCULAR AND METABOLIC DISEASES","MDPI","2024","978-372581295-0",""]
 ];
 
-const booksContainer = document.getElementById('books-list');
-const ulBooks = document.createElement('ul');
+const booksList = document.getElementById('books-list');
 books.forEach(b => {
-  const authors = b[0].replace(/Gaetano Santulli/gi, "<u>Gaetano Santulli</u>");
-  const li = document.createElement('li');
-  li.innerHTML = `<strong>${b[1]}</strong><br>
-                  <em>${authors}</em><br>
-                  <strong class="green">${b[2]}.</strong> ${b[3]}.<br>
-                  ISBN: ${b[4]}<br>
-                  ${b[5] ? `DOI: <a href="https://doi.org/${b[5]}" target="_blank">${b[5]}</a><br>` : ''}`;
-  ulBooks.appendChild(li);
+  const authors = b[0].replace(/Gaetano Santulli/g,'<u>Gaetano Santulli</u>');
+  booksList.innerHTML += `<li>
+    <strong>${b[1]}</strong><br>
+    <em>${authors}</em><br>
+    <span class="journal">${b[2]}.</span> ${b[3]}.<br>
+    ISBN: ${b[4]}<br>
+    ${b[5] ? `DOI: <a href="https://doi.org/${b[5]}" target="_blank">${b[5]}</a><br>` : ''}
+  </li><br>`;
 });
-booksContainer.appendChild(ulBooks);
 
-// ---------------------- CHAPTERS ----------------------
+// ----------------------- CHAPTERS -----------------------
 const chapters = [
   ["Gaetano Santulli","SYMPATHETIC NERVOUS SYSTEM SIGNALING IN HEART FAILURE AND CARDIAC AGING","Pathophysiology and Pharmacotherapy of Cardiovascular Disease. Springer","2015"],
   ["Gaetano Santulli","THE ADRENERGIC SYSTEM IN CARDIOVASCULAR METABOLISM AND AGING","The Cardiovascular Adrenergic System. Springer","2015"],
@@ -189,27 +182,21 @@ const chapters = [
   ["Stanislovas S. Jankauskas, Jessica Gambardella, Urna Kansakar, Scott Wilson, Pasquale Mone, Fahimeh Varzideh, Kwame Donkor, Michael Eacobacci, Ayobami Adebayo, Marco Morelli, John Ferrara, Xujun Wang, Angela Lombardi, Gaetano Santulli","MICRORNA AND DIABETES","MicroRNA: From Bench to Bedside. Elsevier","2022"]
 ];
 
-const chaptersContainer = document.getElementById('chapters-list');
-const ulChapters = document.createElement('ul');
+const chaptersList = document.getElementById('chapters-list');
 chapters.forEach(c => {
-  const authors = c[0].replace(/Gaetano Santulli/gi, "<u>Gaetano Santulli</u>");
-  const li = document.createElement('li');
-  li.innerHTML = `<strong>${c[1]}</strong><br>
-                  <em>${authors}</em><br>
-                  <strong class="green">${c[2]}.</strong> ${c[3]}.`;
-  ulChapters.appendChild(li);
+  const authors = c[0].replace(/Gaetano Santulli/g,'<u>Gaetano Santulli</u>');
+  chaptersList.innerHTML += `<li>
+    <strong>${c[1]}</strong><br>
+    <em>${authors}</em><br>
+    <span class="journal">${c[2]}.</span> ${c[3]}.
+  </li><br>`;
 });
-chaptersContainer.appendChild(ulChapters);
 
-// ---------------------- VISIT COUNTER ----------------------
-const counterKey = 'pageVisits';
-let counter = parseInt(localStorage.getItem(counterKey) || '5432');
-counter++;
-localStorage.setItem(counterKey, counter);
-document.getElementById('counter-value').textContent = counter;
-
-// ---------------------- INIT ----------------------
-fetchPubmed();
+// ----------------------- PAGE VISIT COUNTER -----------------------
+let count = parseInt(localStorage.getItem('pageCounter') || '5432', 10);
+count++;
+localStorage.setItem('pageCounter', count);
+document.getElementById('pageCounter').textContent = `Page Visits: ${count}`;
 </script>
 
 </body>
