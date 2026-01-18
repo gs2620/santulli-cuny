@@ -27,12 +27,11 @@ fetch("/.netlify/functions/pubmed")
       const doiMatch = description.match(/doi:\s*(10\.\d{4,9}\/[^\s]+)/i);
       const doi = doiMatch ? doiMatch[1].replace(/\.$/, "") : null;
 
-      // Extract authors and journal safely
-      // Pattern: Authors. Journal Name. Year...
-      const citationMatch = description.match(/^(.+?)\.\s+(.+?)\.\s+\d{4}/);
-
-      const authors = citationMatch ? citationMatch[1] : "";
-      const journal = citationMatch ? citationMatch[2] : "";
+      // Extract authors and journal more robustly
+      // Assumes description format: "Author1 A, Author2 B, ... Journal Name. Year;..."
+      const citationParts = description.split(".");
+      const authors = citationParts[0] || "";
+      const journal = citationParts[1] ? citationParts[1].trim() : "";
 
       if (!pubsByYear[year]) pubsByYear[year] = [];
 
@@ -50,6 +49,7 @@ fetch("/.netlify/functions/pubmed")
       .sort((a, b) => b - a);
 
     const container = document.getElementById("publications");
+    container.innerHTML = ""; // Clear previous content
 
     sortedYears.forEach(year => {
       const h2 = document.createElement("h2");
