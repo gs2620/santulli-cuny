@@ -1,83 +1,215 @@
-<div id="publications"></div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Publications — Prof. Gaetano Santulli</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{
+    background-color:#ffffff;
+    color:#000000;
+    font-family:Arial, Helvetica, sans-serif;
+    line-height:1.6;
+    padding:30px;
+}
+h1{color:#000000;}
+h2{color:#333333;margin-top:40px;}
+ul{list-style-type:none;padding-left:0;}
+li{
+    margin-bottom:20px;
+    padding:10px;
+    position:relative;
+    transition: background-color 0.25s ease, transform 0.2s ease;
+}
+li:hover{
+    background-color:#f6f6f6;
+    transform:scale(1.015);
+}
+li::after{
+    content:"";
+    position:absolute;
+    left:10px;
+    bottom:6px;
+    width:0;
+    height:1px;
+    background-color:#8B0000;
+    transition:width 0.25s ease;
+}
+li:hover::after{
+    width:calc(100% - 20px);
+}
+a.title{
+    text-decoration:underline;
+    color:#0033cc;
+}
+a.title:hover{text-decoration:none;}
+span.journal{color:#006400;font-weight:bold;} /* Journals green & bold */
+a{color:#0033cc;}
+.toplink{
+    font-weight:bold;
+    margin-bottom:25px;
+    display:block;
+}
+.doi{
+    display:inline-block;
+    text-decoration:underline;
+    position:relative;
+    transition: background-color 0.25s ease, transform 0.2s ease;
+}
+.doi:hover{
+    background-color:#f6f6f6;
+    transform:scale(1.02);
+}
+.doi::after{
+    content:"";
+    position:absolute;
+    left:0;
+    bottom:0;
+    width:0;
+    height:1px;
+    background-color:#8B0000;
+    transition:width 0.25s ease;
+}
+.doi:hover::after{width:100%;}
+#counter{
+    text-align:center;
+    margin-top:50px;
+    font-weight:bold;
+    padding:10px 0;
+    background: linear-gradient(to right, #ff7e5f, #feb47b);
+    color:white;
+    border-radius:10px;
+}
+</style>
+</head>
+<body>
+
+<h1>Publications of Prof. Gaetano Santulli, MD, PhD, FAHA</h1>
+
+<div id="publications"><p>Loading publications...</p></div>
 
 <script>
-fetch("/.netlify/functions/pubmed")
-  .then(res => res.text())
-  .then(xmlText => {
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(xmlText, "text/xml");
-    const items = Array.from(xml.querySelectorAll("item"));
+// ---------------------------
+// PubMed RSS Fetch
+// ---------------------------
+const query = 'Santulli G[Author] NOT corrigendum NOT erratum NOT correction';
+const batchSize = 100; // not strictly needed for RSS
 
+// Journal replacements (same as your Joomla script)
+const journalReplacements = {
+    "ECLINICALMEDICINE":"LANCET eCLINICALMEDICINE",
+    "ISCIENCE":"iSCIENCE",
+    "HYPERTENSION (DALLAS, TEX. : 1979)":"HYPERTENSION",
+    "CELL CYCLE (GEORGETOWN, TEX.)":"CELL CYCLE",
+    "CARDIOVASCULAR DIABETOLOGY. ENDOCRINOLOGY REPORTS":"CARDIOVASCULAR DIABETOLOGY - ENDOCRINOLOGY REPORTS",
+    "NPJ METABOLIC HEALTH AND DISEASE":"NPJ METABOLIC HEALTH AND DISEASE (NATURE PORTFOLIO JOURNAL)",
+    "HYPERTENSION RESEARCH : OFFICIAL JOURNAL OF THE JAPANESE SOCIETY OF HYPERTENSION":"HYPERTENSION RESEARCH",
+    "CELLULAR AND MOLECULAR LIFE SCIENCES : CMLS":"CELLULAR AND MOLECULAR LIFE SCIENCES",
+    "MOLECULAR MEDICINE (CAMBRIDGE, MASS.)":"MOLECULAR MEDICINE",
+    "THE LANCET. HEALTHY LONGEVITY":"THE LANCET HEALTHY LONGEVITY",
+    "THE LANCET. DIABETES & ENDOCRINOLOGY":"THE LANCET DIABETES & ENDOCRINOLOGY",
+    "INTERNATIONAL JOURNAL OF CARDIOLOGY. HEART & VASCULATURE":"INTERNATIONAL JOURNAL OF CARDIOLOGY - HEART & VASCULATURE",
+    "ERJ OPEN RESEARCH":"EUROPEAN RESPIRATORY SOCIETY OPEN RESEARCH",
+    "EUROPEAN HEART JOURNAL. CARDIOVASCULAR PHARMACOTHERAPY":"EUROPEAN HEART JOURNAL - CARDIOVASCULAR PHARMACOTHERAPY",
+    "JOURNAL OF ALZHEIMER'S DISEASE : JAD":"JOURNAL OF ALZHEIMER'S DISEASE",
+    "ANTIOXIDANTS (BASEL, SWITZERLAND)":"ANTIOXIDANTS",
+    "BIOENGINEERING (BASEL, SWITZERLAND)":"BIOENGINEERING",
+    "PROCEEDINGS OF THE NATIONAL ACADEMY OF SCIENCES OF THE UNITED STATES OF AMERICA":"PNAS USA",
+    "JOURNAL OF CLINICAL HYPERTENSION (GREENWICH, CONN.)":"JOURNAL OF CLINICAL HYPERTENSION",
+    "ACTA PHYSIOLOGICA (OXFORD, ENGLAND)":"ACTA PHYSIOLOGICA",
+    "CRITICAL CARE (LONDON, ENGLAND)":"CRITICAL CARE",
+    "IMMUNITY & AGEING : I & A":"IMMUNITY & AGEING",
+    "HIGH BLOOD PRESSURE & CARDIOVASCULAR PREVENTION : THE OFFICIAL JOURNAL OF THE ITALIAN SOCIETY OF HYPERTENSION":"HIGH BLOOD PRESSURE & CARDIOVASCULAR PREVENTION"
+};
+
+// Fetch PubMed RSS (XML)
+fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=200&retmode=json`)
+.then(res=>res.json())
+.then(data=>{
+    const ids = data.esearchresult.idlist;
+    if(ids.length===0){
+        document.getElementById('publications').innerHTML="<p>No publications found.</p>";
+        return;
+    }
+
+    return fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${ids.join(',')}&retmode=xml`);
+})
+.then(res=>res.text())
+.then(xmlText=>{
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(xmlText,'text/xml');
+    const articles = Array.from(xml.querySelectorAll('PubmedArticle'));
     const pubsByYear = {};
 
-    items.forEach(item => {
-      const title = item.querySelector("title")?.textContent || "";
-      const link = item.querySelector("link")?.textContent || "";
-      const pubDate = item.querySelector("pubDate")?.textContent || "";
+    articles.forEach(a=>{
+        const titleNode = a.querySelector('ArticleTitle');
+        if(!titleNode) return;
+        const title = titleNode.textContent;
 
-      // Extract year
-      const yearMatch = pubDate.match(/\d{4}/);
-      const year = yearMatch ? yearMatch[0] : "Unknown";
+        // Authors
+        const authorsNodes = a.querySelectorAll('AuthorList Author');
+        const authors = [];
+        authorsNodes.forEach(au=>{
+            const last = au.querySelector('LastName')?.textContent;
+            const fore = au.querySelector('ForeName')?.textContent;
+            if(fore && last){
+                let name = `${fore} ${last}`;
+                if(name.toLowerCase().includes('gaetano santulli')){
+                    name = `<u>${name}</u>`;
+                }
+                authors.push(name);
+            }
+        });
+        const authorsStr = authors.join(', ');
 
-      // Extract DOI if present in description
-      const rawDesc = item.querySelector("description")?.textContent || "";
-      const doiMatch = rawDesc.match(/doi:\s*(10\.\d{4,9}\/[^\s]+)/i);
-      const doi = doiMatch ? doiMatch[1].replace(/\.$/, "") : null;
+        // Journal
+        let journal = a.querySelector('Journal > Title')?.textContent.toUpperCase() || '';
+        if(journalReplacements[journal]) journal = journalReplacements[journal];
+        if(journal==='RESEARCH SQUARE') return; // skip preprints
 
-      // Get authors from dc:creator (usually comma-separated)
-      const authorsNode = item.querySelector("dc\\:creator");
-      const authors = authorsNode ? authorsNode.textContent : "";
+        // Year
+        let year = a.querySelector('JournalIssue > PubDate > Year')?.textContent || 'n.d.';
 
-      // Get journal from source node
-      const journalNode = item.querySelector("source");
-      const journal = journalNode ? journalNode.textContent : "";
+        // PMID
+        const pmid = a.querySelector('PMID')?.textContent || '';
 
-      if (!pubsByYear[year]) pubsByYear[year] = [];
+        // DOI
+        let doi = '';
+        const articleIds = a.querySelectorAll('ArticleIdList ArticleId');
+        articleIds.forEach(id=>{
+            if(id.getAttribute('IdType')==='doi') doi = id.textContent;
+        });
 
-      pubsByYear[year].push({
-        title,
-        link,
-        authors,
-        journal,
-        doi
-      });
+        if(!pubsByYear[year]) pubsByYear[year]=[];
+        pubsByYear[year].push({title, authorsStr, journal, pmid, doi});
     });
 
-    const sortedYears = Object.keys(pubsByYear)
-      .filter(y => y !== "Unknown")
-      .sort((a, b) => b - a);
-
-    const container = document.getElementById("publications");
-    container.innerHTML = "";
-
-    sortedYears.forEach(year => {
-      const h2 = document.createElement("h2");
-      h2.textContent = year;
-      container.appendChild(h2);
-
-      const ul = document.createElement("ul");
-
-      pubsByYear[year].forEach(pub => {
-        const li = document.createElement("li");
-
-        li.innerHTML = `
-          <strong>${pub.authors}.</strong><br>
-          <span style="color: green; font-weight: bold;">
-            ${pub.journal.toUpperCase()}
-          </span><br>
-          ${pub.title}. 
-          <a href="${pub.link}" target="_blank">PubMed</a>
-          ${pub.doi ? ` | <a href="https://doi.org/${pub.doi}" target="_blank">DOI</a>` : ""}
-        `;
-
-        ul.appendChild(li);
-      });
-
-      container.appendChild(ul);
+    const container = document.getElementById('publications');
+    container.innerHTML='';
+    Object.keys(pubsByYear).sort((a,b)=>b-a).forEach(year=>{
+        const h2 = document.createElement('h2');
+        h2.textContent = year;
+        container.appendChild(h2);
+        const ul = document.createElement('ul');
+        pubsByYear[year].forEach(p=>{
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <strong><a href="https://pubmed.ncbi.nlm.nih.gov/${p.pmid}/" target="_blank" class="title">${p.title}</a></strong><br>
+                <em>${p.authorsStr}</em><br>
+                <span class="journal">${p.journal}</span><br>
+                PMID: ${p.pmid}
+                ${p.doi ? `<br>DOI: <a href="https://doi.org/${p.doi}" target="_blank" class="doi">${p.doi}</a>` : ''}
+            `;
+            ul.appendChild(li);
+        });
+        container.appendChild(ul);
     });
-  })
-  .catch(() => {
-    document.getElementById("publications").innerHTML =
-      "<p>Error loading publications.</p>";
-  });
+})
+.catch(err=>{
+    console.error(err);
+    document.getElementById('publications').innerHTML="<p>Error loading publications.</p>";
+});
 </script>
+
+</body>
+</html>
