@@ -7,7 +7,7 @@
   body {
     font-family: Arial, sans-serif;
     margin: 20px;
-    padding-left: 40px; /* Increased left margin */
+    padding-left: 50px; /* Increased left margin */
     line-height: 1.6;
   }
 
@@ -37,7 +37,7 @@
 
   ul {
     list-style: none;
-    padding-left: 0;
+    padding-left: 20px; /* Indented lists */
   }
 
   li {
@@ -49,12 +49,16 @@
     transform: scale(1.02);
   }
 
-  strong.book-title {
-    color: blue; /* BOOK and CHAPTER titles in blue */
+  /* BOOKS & CHAPTER titles in blue */
+  .book-title {
+    color: blue;
+    font-weight: bold;
   }
 
-  strong.journal {
-    color: green; /* Journals remain green */
+  /* Journals in green */
+  .journal {
+    color: green;
+    font-weight: bold;
   }
 
   u {
@@ -104,7 +108,7 @@
 
 <script>
 // ---------------------------
-// 1. Counter (LocalStorage-based)
+// Counter
 // ---------------------------
 let count = localStorage.getItem('pageCounter') || 5432;
 count++;
@@ -112,7 +116,7 @@ localStorage.setItem('pageCounter', count);
 document.getElementById('counter').textContent = count;
 
 // ---------------------------
-// 2. Books & Chapters Data
+// Books & Chapters Data
 // ---------------------------
 const books = [
   ["Gaetano Santulli","ANGIOGENESIS: INSIGHTS FROM A SYSTEMATIC OVERVIEW","Nova Publishers Inc., New York, NY","2013","978-162618114-4",""],
@@ -139,6 +143,7 @@ const chapters = [
   ["Stanislovas S. Jankauskas, Jessica Gambardella, Urna Kansakar, Scott Wilson, Pasquale Mone, Fahimeh Varzideh, Kwame Donkor, Michael Eacobacci, Ayobami Adebayo, Marco Morelli, John Ferrara, Xujun Wang, Angela Lombardi, Gaetano Santulli","MICRORNA AND DIABETES","MicroRNA: From Bench to Bedside. Elsevier","2022"]
 ];
 
+// Render Books
 function renderBooks() {
   const list = document.getElementById('books-list');
   books.forEach(b => {
@@ -149,6 +154,7 @@ function renderBooks() {
   });
 }
 
+// Render Chapters
 function renderChapters() {
   const list = document.getElementById('chapters-list');
   chapters.forEach(c => {
@@ -163,10 +169,7 @@ function renderChapters() {
 renderBooks();
 renderChapters();
 
-// ---------------------------
-// 3. Fetch PubMed Data via API
-// ---------------------------
-// (unchanged, same as your original code)
+// PubMed fetch code stays the same as your original (unchanged)
 </script>
 
 </body>
