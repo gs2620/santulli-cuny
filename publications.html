@@ -14,21 +14,25 @@ fetch("/.netlify/functions/pubmed")
       const title = item.querySelector("title")?.textContent || "";
       const link = item.querySelector("link")?.textContent || "";
       const pubDate = item.querySelector("pubDate")?.textContent || "";
-      const description = item.querySelector("description")?.textContent || "";
+      const rawDesc = item.querySelector("description")?.textContent || "";
 
-      // Year
+      // Remove HTML tags
+      const description = rawDesc.replace(/<[^>]+>/g, "").trim();
+
+      // Extract year
       const yearMatch = pubDate.match(/\d{4}/);
       const year = yearMatch ? yearMatch[0] : "Unknown";
 
-      // DOI
-      const doiMatch = description.match(/doi:\s*(10\.\d{4,9}\/[^\s.]+)/i);
-      const doi = doiMatch ? doiMatch[1] : null;
+      // Extract DOI
+      const doiMatch = description.match(/doi:\s*(10\.\d{4,9}\/[^\s]+)/i);
+      const doi = doiMatch ? doiMatch[1].replace(/\.$/, "") : null;
 
-      // Split description
-      const parts = description.split(".");
+      // Extract authors and journal safely
+      // Pattern: Authors. Journal Name. Year...
+      const citationMatch = description.match(/^(.+?)\.\s+(.+?)\.\s+\d{4}/);
 
-      const authors = parts[0]?.trim() || "";
-      const journal = parts[1]?.trim() || "";
+      const authors = citationMatch ? citationMatch[1] : "";
+      const journal = citationMatch ? citationMatch[2] : "";
 
       if (!pubsByYear[year]) pubsByYear[year] = [];
 
