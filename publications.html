@@ -27,7 +27,7 @@
   <a href="#books" class="click-link">→ Click here for BOOKS & BOOK CHAPTERS</a>
 </p>
 
-<div id="publications"></div>
+<div id="publications">Loading publications…</div>
 
 <hr style="margin:40px 0;">
 
@@ -43,7 +43,8 @@
 <div class="page-counter" id="pageCounter">Page Visits: 0</div>
 
 <script>
-// ----------------------- PUBMED FETCH -----------------------
+// ----------------------- CONFIG -----------------------
+const workerUrl = 'https://your-worker-name.pages.dev/'; // replace with your Cloudflare Worker URL
 const query = '(((((Santulli, G[Author]) NOT corrigendum[Title]) NOT spider[Title]) NOT erratum[Title]) NOT habitat[Title]) NOT dogs[Title]) NOT correction[Title]) NOT violence[Title]';
 const excludedTitle = 'Creation of a Novel Virtual Reality Simulation to Increase Nursing Skills in Management of Workplace Violence';
 const excludedDOI = '10.1097/NNA.0000000000001548';
@@ -73,60 +74,46 @@ const journalReplacements = {
   "CRITICAL CARE (LONDON, ENGLAND)": "CRITICAL CARE"
 };
 
+// ----------------------- FETCH & RENDER PUBMED -----------------------
 async function fetchPubmed() {
-  const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=100000&retmode=json`;
-  const searchData = await fetch(esearchUrl).then(r => r.json());
-  const ids = searchData.esearchresult.idlist;
-  if (!ids || ids.length === 0) {
-    document.getElementById('publications').innerHTML = "<p>No articles found.</p>";
-    return;
-  }
+  const res = await fetch(`${workerUrl}?q=${encodeURIComponent(query)}&retmax=100000`);
+  const xmlText = await res.text();
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, "application/xml");
+  const pubArticles = xml.querySelectorAll("PubmedArticle");
 
-  const batchSize = 100;
-  let articles = {};
-  for (let i = 0; i < ids.length; i += batchSize) {
-    const batchIds = ids.slice(i, i + batchSize).join(',');
-    const efetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${batchIds}&retmode=xml`;
-    const xmlText = await fetch(efetchUrl).then(r => r.text());
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(xmlText, "application/xml");
-    const pubArticles = xml.querySelectorAll("PubmedArticle");
-
-    pubArticles.forEach(a => {
-      const title = a.querySelector("ArticleTitle")?.textContent || '';
-      let doi = '';
-      a.querySelectorAll("ArticleId").forEach(id => {
-        if (id.getAttribute('IdType') === 'doi') doi = id.textContent;
-      });
-      if (title.includes(excludedTitle) || doi.toLowerCase() === excludedDOI.toLowerCase()) return;
-
-      let journal = a.querySelector("Journal > Title")?.textContent.toUpperCase() || '';
-      journal = journalReplacements[journal] || journal;
-      if (journal === "RESEARCH SQUARE") return;
-
-      const year = a.querySelector("JournalIssue > PubDate > Year")?.textContent || 'n.d.';
-      const authors = Array.from(a.querySelectorAll("AuthorList > Author"))
-        .map(au => {
-          const last = au.querySelector("LastName")?.textContent;
-          const first = au.querySelector("ForeName")?.textContent;
-          if (!last || !first) return '';
-          let name = `${first} ${last}`;
-          if (name.includes("Gaetano Santulli")) name = `<u>${name}</u>`;
-          return name;
-        })
-        .filter(Boolean)
-        .join(', ');
-
-      if (!articles[year]) articles[year] = [];
-      articles[year].push({
-        title, authors, journal, year,
-        pmid: a.querySelector("PMID")?.textContent || '',
-        doi
-      });
+  const articles = {};
+  pubArticles.forEach(a => {
+    const title = a.querySelector("ArticleTitle")?.textContent || '';
+    let doi = '';
+    a.querySelectorAll("ArticleId").forEach(id => {
+      if (id.getAttribute('IdType') === 'doi') doi = id.textContent;
     });
-  }
+    if (title.includes(excludedTitle) || doi.toLowerCase() === excludedDOI.toLowerCase()) return;
+
+    let journal = a.querySelector("Journal > Title")?.textContent.toUpperCase() || '';
+    journal = journalReplacements[journal] || journal;
+    if (journal === "RESEARCH SQUARE") return;
+
+    const year = a.querySelector("JournalIssue > PubDate > Year")?.textContent || 'n.d.';
+    const authors = Array.from(a.querySelectorAll("AuthorList > Author"))
+      .map(au => {
+        const last = au.querySelector("LastName")?.textContent;
+        const first = au.querySelector("ForeName")?.textContent;
+        if (!last || !first) return '';
+        let name = `${first} ${last}`;
+        if (name.includes("Gaetano Santulli")) name = `<u>${name}</u>`;
+        return name;
+      })
+      .filter(Boolean)
+      .join(', ');
+
+    if (!articles[year]) articles[year] = [];
+    articles[year].push({ title, authors, journal, year, pmid: a.querySelector("PMID")?.textContent || '', doi });
+  });
 
   const container = document.getElementById('publications');
+  container.innerHTML = '';
   Object.keys(articles).sort((a,b)=>b.localeCompare(a)).forEach(year => {
     const list = articles[year].map(p => `
       <li>
@@ -140,7 +127,6 @@ async function fetchPubmed() {
     container.innerHTML += `<h2>Year: ${year}</h2><ul>${list}</ul>`;
   });
 }
-
 fetchPubmed();
 
 // ----------------------- BOOKS -----------------------
