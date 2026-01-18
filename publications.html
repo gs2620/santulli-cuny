@@ -1,44 +1,80 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Publications – Santulli Lab</title>
-</head>
+<div id="publications"></div>
 
-<body>
+<script>
+fetch("/.netlify/functions/pubmed")
+  .then(res => res.text())
+  .then(xmlText => {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(xmlText, "text/xml");
+    const items = Array.from(xml.querySelectorAll("item"));
 
-  <h1>Publications</h1>
+    const pubsByYear = {};
 
-  <p>
-    The following publications are automatically retrieved from PubMed.
-  </p>
+    items.forEach(item => {
+      const title = item.querySelector("title")?.textContent || "";
+      const link = item.querySelector("link")?.textContent || "";
+      const pubDate = item.querySelector("pubDate")?.textContent || "";
+      const description = item.querySelector("description")?.textContent || "";
 
-  <!-- Publications list will appear here -->
-  <ul id="pubs"></ul>
+      // Year
+      const yearMatch = pubDate.match(/\d{4}/);
+      const year = yearMatch ? yearMatch[0] : "Unknown";
 
-  <!-- RSS → JSON script -->
-  <script>
-    fetch("https://api.rss2json.com/v1/api.json?rss_url=https://pubmed.ncbi.nlm.nih.gov/rss/search/1hWsC1jJ5A-qte8kpcuVrXkbRYROR8FyO0vQvRL2XWXsz6As4A/?limit=200")
-      .then(response => response.json())
-      .then(data => {
-        const list = document.getElementById("pubs");
+      // DOI
+      const doiMatch = description.match(/doi:\s*(10\.\d{4,9}\/[^\s.]+)/i);
+      const doi = doiMatch ? doiMatch[1] : null;
 
-        if (!data.items) {
-          list.innerHTML = "<li>Unable to load publications.</li>";
-          return;
-        }
+      // Split description
+      const parts = description.split(".");
 
-        data.items.forEach(item => {
-          const li = document.createElement("li");
-          li.innerHTML = `<a href="${item.link}" target="_blank">${item.title}</a>`;
-          list.appendChild(li);
-        });
-      })
-      .catch(error => {
-        document.getElementById("pubs").innerHTML =
-          "<li>Error loading publications.</li>";
+      const authors = parts[0]?.trim() || "";
+      const journal = parts[1]?.trim() || "";
+
+      if (!pubsByYear[year]) pubsByYear[year] = [];
+
+      pubsByYear[year].push({
+        title,
+        link,
+        authors,
+        journal,
+        doi
       });
-  </script>
+    });
 
-</body>
-</html>
+    const sortedYears = Object.keys(pubsByYear)
+      .filter(y => y !== "Unknown")
+      .sort((a, b) => b - a);
+
+    const container = document.getElementById("publications");
+
+    sortedYears.forEach(year => {
+      const h2 = document.createElement("h2");
+      h2.textContent = year;
+      container.appendChild(h2);
+
+      const ul = document.createElement("ul");
+
+      pubsByYear[year].forEach(pub => {
+        const li = document.createElement("li");
+
+        li.innerHTML = `
+          <strong>${pub.authors}.</strong><br>
+          <span style="color: green; font-weight: bold;">
+            ${pub.journal.toUpperCase()}
+          </span><br>
+          ${pub.title}. 
+          <a href="${pub.link}" target="_blank">PubMed</a>
+          ${pub.doi ? ` | <a href="https://doi.org/${pub.doi}" target="_blank">DOI</a>` : ""}
+        `;
+
+        ul.appendChild(li);
+      });
+
+      container.appendChild(ul);
+    });
+  })
+  .catch(() => {
+    document.getElementById("publications").innerHTML =
+      "<p>Error loading publications.</p>";
+  });
+</script>
