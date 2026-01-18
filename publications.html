@@ -14,24 +14,23 @@ fetch("/.netlify/functions/pubmed")
       const title = item.querySelector("title")?.textContent || "";
       const link = item.querySelector("link")?.textContent || "";
       const pubDate = item.querySelector("pubDate")?.textContent || "";
-      const rawDesc = item.querySelector("description")?.textContent || "";
-
-      // Remove HTML tags
-      const description = rawDesc.replace(/<[^>]+>/g, "").trim();
 
       // Extract year
       const yearMatch = pubDate.match(/\d{4}/);
       const year = yearMatch ? yearMatch[0] : "Unknown";
 
-      // Extract DOI
-      const doiMatch = description.match(/doi:\s*(10\.\d{4,9}\/[^\s]+)/i);
+      // Extract DOI if present in description
+      const rawDesc = item.querySelector("description")?.textContent || "";
+      const doiMatch = rawDesc.match(/doi:\s*(10\.\d{4,9}\/[^\s]+)/i);
       const doi = doiMatch ? doiMatch[1].replace(/\.$/, "") : null;
 
-      // Extract authors and journal more robustly
-      // Assumes description format: "Author1 A, Author2 B, ... Journal Name. Year;..."
-      const citationParts = description.split(".");
-      const authors = citationParts[0] || "";
-      const journal = citationParts[1] ? citationParts[1].trim() : "";
+      // Get authors from dc:creator (usually comma-separated)
+      const authorsNode = item.querySelector("dc\\:creator");
+      const authors = authorsNode ? authorsNode.textContent : "";
+
+      // Get journal from source node
+      const journalNode = item.querySelector("source");
+      const journal = journalNode ? journalNode.textContent : "";
 
       if (!pubsByYear[year]) pubsByYear[year] = [];
 
@@ -49,7 +48,7 @@ fetch("/.netlify/functions/pubmed")
       .sort((a, b) => b - a);
 
     const container = document.getElementById("publications");
-    container.innerHTML = ""; // Clear previous content
+    container.innerHTML = "";
 
     sortedYears.forEach(year => {
       const h2 = document.createElement("h2");
